@@ -31,10 +31,10 @@ pub enum MathError {
     NegativeSquareRoot,
 }
 
-trait SolveSimpleExpression<T> {
+trait SolveExpression<T> {
 
     /// Evaluates a simple arithmetic expression consisting of two operands and a given operator.
-    fn solve_simple_expression(
+    fn evaluate(
         left_operand: T,
         operator: MathOperator,
         right_operand: T,
@@ -44,9 +44,9 @@ trait SolveSimpleExpression<T> {
         Self: Sized;
 }
 
-impl<T: Float> SolveSimpleExpression<T> for ExpressionLayer<T> {   
+impl<T: Float> SolveExpression<T> for ExpressionLayer<T> {   
 
-    fn solve_simple_expression(
+    fn evaluate(
         left_operand: T,
         operator: MathOperator,
         right_operand: T,
@@ -117,10 +117,10 @@ mod solve_expression_test {
     #[test]
     fn solve_simple_expression() {
         assert_eq!(
-            ExpressionLayer::solve_simple_expression(f32::, MathOperator::Add, 5.0).unwrap(), 10.0
+            ExpressionLayer::evaluate(f32::, MathOperator::Add, 5.0).unwrap(), 10.0
         );
         assert_eq!(
-            ExpressionLayer::solve_simple_expression(5.0, MathOperator::Add, 5.0).unwrap(), 10.0
+            ExpressionLayer::evaluate(5.0, MathOperator::Add, 5.0).unwrap(), 10.0
         );
     }
 }
