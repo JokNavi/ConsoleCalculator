@@ -1,7 +1,7 @@
 use num_traits::{Float};
 use core::{fmt::Debug};
 
-use crate::checked_operations::{FloatCheckedOperations, MathError};
+use crate::checked_operations::{CheckedFloatOperations, MathError};
 
 #[derive(PartialEq, Debug)]
 pub enum MathOperator {
@@ -28,7 +28,7 @@ pub enum ExpressionLayer<T> {
 trait EvaluateExpression {
 
     /// Evaluates a simple arithmetic expression consisting of two operands and a given operator.
-    fn checked_evaluate_simple_expression<Y: FloatCheckedOperations>(
+    fn checked_evaluate_simple_expression<Y: CheckedFloatOperations>(
         left_operand: Y,
         operator: MathOperator,
         right_operand: Y,
@@ -40,7 +40,7 @@ trait EvaluateExpression {
 
 impl<T> EvaluateExpression for ExpressionLayer<T> {   
 
-    fn checked_evaluate_simple_expression<Y: FloatCheckedOperations>(
+    fn checked_evaluate_simple_expression<Y: CheckedFloatOperations>(
         left_operand: Y,
         operator: MathOperator,
         right_operand: Y,

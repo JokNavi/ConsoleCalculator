@@ -8,6 +8,7 @@ fn main() {
     assert_eq!(test >= f32::MAX, true);
     assert_eq!(test >= f32::INFINITY, false);
     assert_eq!(test == f32::NAN, false);
+    assert_eq!(f32::NAN, f32::NAN);
    
 }
 
