@@ -1,5 +1,7 @@
+use num_traits::Float;
+
 #[derive(Debug, PartialEq)]
-pub enum MathOperators {
+pub enum MathOperator {
     Add,
     Sub,
     Mul,
@@ -11,7 +13,7 @@ pub enum MathOperators {
 #[derive(Debug, PartialEq)]
 pub enum ExpressionValue<V> {
     Operand(V),
-    Operator(MathOperators),
+    Operator(MathOperator),
 }
 
 #[derive(Debug, PartialEq)]
@@ -21,3 +23,16 @@ pub enum RecursiveExpression<V> {
 }
 
 pub type Layer<V> = Vec<RecursiveExpression<V>>;
+
+#[derive(Debug, PartialEq)]
+pub enum ExpressionSolveError {
+
+}
+
+impl<V: Float> RecursiveExpression<V> {
+    const ORDER_OF_OPERATIONS: [&[MathOperator]; 3] = [&[MathOperator::Pow], &[MathOperator::Mul, MathOperator::Div, MathOperator::Rem], &[MathOperator::Add, MathOperator::Sub]];
+
+    pub fn solve(&self) -> Result<V, ExpressionSolveError> {
+        todo!()
+    }
+}
