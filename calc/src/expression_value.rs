@@ -326,7 +326,13 @@ mod evaluate_tests {
     #[test]
     fn solve_ok() {
         let expression: Vec<ExpressionEnum<f32>> =  vec![EquationItem::Operand(1.0), EquationItem::Operator(MathOperator::Add), EquationItem::Operand(1.0)].into_iter().map(|f| ExpressionEnum::Value(f)).collect();
-        assert_eq!(expression.solve().unwrap(), 2.0);
-        
+        let nested_expression = vec![ExpressionEnum::Expression(Box::new(expression)),  ExpressionEnum::Value(EquationItem::Operator(MathOperator::Add)),  ExpressionEnum::Value(EquationItem::Operand(1.0))];
+        assert_eq!(nested_expression.solve().unwrap(), 3.0);
+        }
+
+    #[test]
+    fn solve_err() {
+            let nested_expression = vec![ExpressionEnum::Expression(Box::new(vec![])),  ExpressionEnum::Value(EquationItem::Operator(MathOperator::Add)),  ExpressionEnum::Value(EquationItem::Operand(1.0))];
+            assert_eq!(nested_expression.solve().unwrap_err(), ExpressionError::EmptyExpressionLayer);
         }
 }
