@@ -83,8 +83,7 @@ impl<V> TryPushEquation<V> for Vec<EquationItem<V>> {
     fn try_push(&mut self, item: EquationItem<V>) -> Result<(), ExpressionError> {
         let last_item = self
             .last()
-            .or(Some(&EquationItem::Operator(MathOperator::Add)))
-            .unwrap();
+            .unwrap_or(&EquationItem::Operator(MathOperator::Add));
 
         match item {
             EquationItem::Operand(_) if matches!(last_item, EquationItem::Operand(_)) => {
@@ -114,7 +113,7 @@ impl<V: Float + Debug> EvaluateOperator for Vec<EquationItem<V>> {
     {
         let mut new_layer: Vec<EquationItem<V>> = Vec::new();
 
-        new_layer.push(*self.first().ok_or(ExpressionError::EmptyExpressionLayer)?);
+        new_layer.push(EquationItem::Operand(self.first().ok_or(ExpressionError::EmptyExpressionLayer)?.operand().ok_or(ExpressionError::ExpectedOperand)?));
 
         let self_iter = self[1..].chunks_exact(2);
 
@@ -144,10 +143,8 @@ impl<V: Float + Debug> EvaluateOperator for Vec<EquationItem<V>> {
                     MathOperator::Rem => left_operand.rem(right_operand),
                     MathOperator::Pow => left_operand.powf(right_operand),
                 };
-                dbg!(&solution);
                 new_layer.push(EquationItem::Operand(solution));
             } else {
-                dbg!(current_equation);
                 new_layer.try_push(
                     *current_equation
                         .get(0)
@@ -161,9 +158,12 @@ impl<V: Float + Debug> EvaluateOperator for Vec<EquationItem<V>> {
             }
         }
 
-        if let Some(value) = self_iter.remainder().get(0) {
-            new_layer.try_push(*value)?;
-        }
+        match self_iter.remainder().get(0) {
+            Some(EquationItem::Operand(_)) => Err(ExpressionError::ExpectedOperator),
+            Some(EquationItem::Operator(_)) => Err(ExpressionError::ExpectedOperand),
+            None => Ok(()),
+        }?;
+
         Ok(new_layer)
     }
 }
@@ -197,8 +197,8 @@ impl<V: Float + Debug> SolveExpression<V> for Expression<V> {
             .collect::<Result<Vec<EquationItem<V>>, ExpressionError>>()?;
 
         for current_order_of_operations_operators in Self::ORDER_OF_OPERATIONS.iter() {
-            dbg!(&current_order_of_operations_operators);
-            equation_items = equation_items.eval_operators(&current_order_of_operations_operators)?;
+            equation_items =
+                equation_items.eval_operators(current_order_of_operations_operators)?;
         }
 
         equation_items
@@ -233,11 +233,62 @@ mod evaluate_tests {
                 .unwrap(),
             test_expression_answer
         );
+        let test_expression: Vec<EquationItem<f32>> = vec![EquationItem::Operand(1.0)];
+        assert_eq!(
+            test_expression
+                .eval_operators(&[MathOperator::Add])
+                .unwrap(),
+            vec![EquationItem::Operand(1.0)]
+        );
     }
-    
+
     #[test]
     fn eval_operators_err() {
 
+        let test_expression: Vec<EquationItem<f32>> = vec![
+            EquationItem::Operand(1.0),
+            EquationItem::Operator(MathOperator::Add),
+            EquationItem::Operand(1.0),
+            EquationItem::Operator(MathOperator::Sub),
+        ];
+        assert_eq!(
+            test_expression
+                .eval_operators(&[MathOperator::Add])
+                .unwrap_err(),
+            ExpressionError::ExpectedOperand
+        );
+
+        let test_expression: Vec<EquationItem<f32>> = vec![];
+        assert_eq!(
+            test_expression
+                .eval_operators(&[MathOperator::Add])
+                .unwrap_err(),
+            ExpressionError::EmptyExpressionLayer
+        );
+
+        let test_expression: Vec<EquationItem<f32>> = vec![
+            EquationItem::Operand(1.0),
+            EquationItem::Operator(MathOperator::Add),
+            EquationItem::Operand(1.0),
+            EquationItem::Operand(1.0),
+        ];
+        assert_eq!(
+            test_expression
+                .eval_operators(&[MathOperator::Add])
+                .unwrap_err(),
+            ExpressionError::ExpectedOperator
+        );
+        let test_expression: Vec<EquationItem<f32>> = vec![
+            EquationItem::Operator(MathOperator::Add),
+        ];
+        assert_eq!(
+            test_expression
+                .eval_operators(&[MathOperator::Add])
+                .unwrap_err(),
+            ExpressionError::ExpectedOperand
+        );
+        
+        
     }
 
     #[test]
@@ -271,4 +322,11 @@ mod evaluate_tests {
             )))
         );
     }
+
+    #[test]
+    fn solve_ok() {
+        let expression: Vec<ExpressionEnum<f32>> =  vec![EquationItem::Operand(1.0), EquationItem::Operator(MathOperator::Add), EquationItem::Operand(1.0)].into_iter().map(|f| ExpressionEnum::Value(f)).collect();
+        assert_eq!(expression.solve().unwrap(), 2.0);
+        
+        }
 }
