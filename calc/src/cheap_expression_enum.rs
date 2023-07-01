@@ -39,60 +39,66 @@ impl CheapEquationItem {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum EvaluteError {
+pub enum ReduceCheapEquationItemError {
     ExpectedOperand,
     ExpectedOperator,
 }
 
-pub trait Evaluate {
-    /// evaluates an expression and returns the result.
-    fn evaluate(&self) -> Result<Self, EvaluteError>
+pub trait Reduce {
+    type ReduceError;
+    /// returns the shorstest representation of self.
+    fn try_reduced(&self) -> Result<Self, Self::ReduceError>
     where
         Self: Sized;
 }
 
-impl Evaluate for Vec<CheapEquationItem> {
-    fn evaluate(&self) -> Result<Self, EvaluteError> {
+impl Reduce for Vec<CheapEquationItem> {
+    type ReduceError = ReduceCheapEquationItemError;
+
+    fn try_reduced(&self) -> Result<Self, Self::ReduceError> {
         const OPERATION_ORDER: [&'static [char]; 3] = [&['^'], &['*', '/', '%'], &['+', '-']];
         if matches!(self.as_slice(), [CheapEquationItem::Operand(_)]) {
-            return Err(EvaluteError::ExpectedOperator);
+            return Err(ReduceCheapEquationItemError::ExpectedOperator);
         }
         let mut expression = self.clone();
         for operations in OPERATION_ORDER.into_iter() {
             expression = expression
                 .get(1..)
-                .ok_or(EvaluteError::ExpectedOperand)?
+                .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?
                 .chunks(2)
                 .fold(
                     Ok(vec![CheapEquationItem::Operand(
                         expression
                             .first()
-                            .ok_or(EvaluteError::ExpectedOperand)?
-                            .evaluate()?
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?
+                            .try_reduced()?
                             .operand()
-                            .ok_or(EvaluteError::ExpectedOperand)?,
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?,
                     )]),
-                    |collector_result: Result<Vec<CheapEquationItem>, EvaluteError>,
+                    |collector_result: Result<
+                        Vec<CheapEquationItem>,
+                        ReduceCheapEquationItemError,
+                    >,
                      chunk: &[CheapEquationItem]| {
                         let mut collector = collector_result?;
                         let left_operand = collector
                             .pop()
                             .unwrap()
-                            .evaluate()?
+                            .try_reduced()?
                             .operand()
-                            .ok_or(EvaluteError::ExpectedOperand)?;
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?;
                         let operator = *chunk
                             .get(0)
-                            .ok_or(EvaluteError::ExpectedOperator)?
-                            .evaluate()?
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperator)?
+                            .try_reduced()?
                             .operator()
-                            .ok_or(EvaluteError::ExpectedOperator)?;
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperator)?;
                         let right_operand = chunk
                             .get(1)
-                            .ok_or(EvaluteError::ExpectedOperand)?
-                            .evaluate()?
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?
+                            .try_reduced()?
                             .operand()
-                            .ok_or(EvaluteError::ExpectedOperand)?;
+                            .ok_or(ReduceCheapEquationItemError::ExpectedOperand)?;
                         if operations.contains(&operator) {
                             let answer = match operator {
                                 '^' => Ok(left_operand.powf(right_operand)),
@@ -117,14 +123,15 @@ impl Evaluate for Vec<CheapEquationItem> {
     }
 }
 
-impl Evaluate for CheapEquationItem {
-    fn evaluate(&self) -> Result<Self, EvaluteError> {
+impl Reduce for CheapEquationItem {
+    type ReduceError = ReduceCheapEquationItemError;
+    fn try_reduced(&self) -> Result<Self, Self::ReduceError> {
         match self {
             CheapEquationItem::Operand(operand) => Ok(CheapEquationItem::Operand(*operand)),
             CheapEquationItem::Operator(operator) => Ok(CheapEquationItem::Operator(*operator)),
             CheapEquationItem::Parenthesis(parenthesis) => Ok(CheapEquationItem::Operand(
                 parenthesis
-                    .evaluate()?
+                    .try_reduced()?
                     .get(0)
                     .expect("I coded .evaluate() well.")
                     .operand()
@@ -134,73 +141,83 @@ impl Evaluate for CheapEquationItem {
     }
 }
 
+pub enum EvaluteStringError {
+    EvaluteError(ReduceCheapEquationItemError),
+    UnClosedParenthesis,
+}
+
+impl TryFrom<&str> for CheapEquationItem {
+    type Error = EvaluteStringError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
-mod cheap_equation_item_tests {
+mod evaluate_tests {
     use super::*;
 
     #[test]
     fn evaluate() {
-         let expression: Vec<CheapEquationItem> = vec![
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
-             CheapEquationItem::Operand(1.0),
-         ];
-             assert_eq!(
-                 expression.evaluate().unwrap(),
-                 vec![CheapEquationItem::Operand(2.0)]
-             );
-         let nested_expression = vec![
-              CheapEquationItem::Operand(1.0),
-              CheapEquationItem::Operator('+'),
-              CheapEquationItem::Parenthesis(Box::new(expression)),
-         ];
-          assert_eq!(
-              nested_expression.evaluate().unwrap(),
-              vec![CheapEquationItem::Operand(3.0)]
-          );
+        let expression: Vec<CheapEquationItem> = vec![
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Operand(1.0),
+        ];
+        assert_eq!(
+            expression.try_reduced().unwrap(),
+            vec![CheapEquationItem::Operand(2.0)]
+        );
+        let nested_expression = vec![
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Parenthesis(Box::new(expression)),
+        ];
+        assert_eq!(
+            nested_expression.try_reduced().unwrap(),
+            vec![CheapEquationItem::Operand(3.0)]
+        );
 
         let broken_expression: Vec<CheapEquationItem> = vec![
             CheapEquationItem::Operand(1.0),
             CheapEquationItem::Operator('+'),
         ];
         assert_eq!(
-            broken_expression.evaluate().unwrap_err(),
-            EvaluteError::ExpectedOperand,
+            broken_expression.try_reduced().unwrap_err(),
+            ReduceCheapEquationItemError::ExpectedOperand,
         );
 
-          let broken_expression: Vec<CheapEquationItem> = vec![
-              CheapEquationItem::Operand(1.0),
-          ];
-          assert_eq!(
-              broken_expression.evaluate().unwrap_err(),
-              EvaluteError::ExpectedOperator,
-         );
-         let broken_expression: Vec<CheapEquationItem> = vec![
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
+        let broken_expression: Vec<CheapEquationItem> = vec![CheapEquationItem::Operand(1.0)];
+        assert_eq!(
+            broken_expression.try_reduced().unwrap_err(),
+            ReduceCheapEquationItemError::ExpectedOperator,
+        );
+        let broken_expression: Vec<CheapEquationItem> = vec![
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+        ];
+        assert_eq!(
+            broken_expression.try_reduced().unwrap_err(),
+            ReduceCheapEquationItemError::ExpectedOperand,
+        );
 
-         ];
-         assert_eq!(
-             broken_expression.evaluate().unwrap_err(),
-             EvaluteError::ExpectedOperand,
-         );
+        let broken_expression: Vec<CheapEquationItem> = vec![
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operator('+'),
+            CheapEquationItem::Operand(1.0),
+            CheapEquationItem::Operand(1.0),
+        ];
 
-         let broken_expression: Vec<CheapEquationItem> = vec![
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operator('+'),
-             CheapEquationItem::Operand(1.0),
-             CheapEquationItem::Operand(1.0),
-         ];
-
-         assert_eq!(
-            broken_expression.evaluate().unwrap_err(),
-            EvaluteError::ExpectedOperator,
+        assert_eq!(
+            broken_expression.try_reduced().unwrap_err(),
+            ReduceCheapEquationItemError::ExpectedOperator,
         );
     }
 }
