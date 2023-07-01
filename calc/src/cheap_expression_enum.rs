@@ -81,21 +81,18 @@ impl Evaluate for Vec<CheapEquationItem> {
                             .evaluate()?
                             .operand()
                             .ok_or(EvaluteError::ExpectedOperand)?;
-                        dbg!(&left_operand);
                         let operator = *chunk
                             .get(0)
                             .ok_or(EvaluteError::ExpectedOperator)?
                             .evaluate()?
                             .operator()
                             .ok_or(EvaluteError::ExpectedOperator)?;
-                        dbg!(&operator);
                         let right_operand = chunk
                             .get(1)
                             .ok_or(EvaluteError::ExpectedOperand)?
                             .evaluate()?
                             .operand()
                             .ok_or(EvaluteError::ExpectedOperand)?;
-                        dbg!(&right_operand);
                         if operations.contains(&operator) {
                             let answer = match operator {
                                 '^' => Ok(left_operand.powf(right_operand)),
@@ -106,14 +103,12 @@ impl Evaluate for Vec<CheapEquationItem> {
                                 '-' => Ok(left_operand - right_operand),
                                 _ => unreachable!(),
                             }?;
-                            dbg!(&answer);
                             collector.push(CheapEquationItem::Operand(answer));
                         } else {
                             collector.push(CheapEquationItem::Operand(left_operand));
                             collector.push(CheapEquationItem::Operator(operator));
                             collector.push(CheapEquationItem::Operand(right_operand));
                         }
-                        dbg!(&collector);
                         Ok(collector)
                     },
                 )?;
@@ -193,5 +188,19 @@ mod cheap_equation_item_tests {
              broken_expression.evaluate().unwrap_err(),
              EvaluteError::ExpectedOperand,
          );
+
+         let broken_expression: Vec<CheapEquationItem> = vec![
+             CheapEquationItem::Operand(1.0),
+             CheapEquationItem::Operator('+'),
+             CheapEquationItem::Operand(1.0),
+             CheapEquationItem::Operator('+'),
+             CheapEquationItem::Operand(1.0),
+             CheapEquationItem::Operand(1.0),
+         ];
+
+         assert_eq!(
+            broken_expression.evaluate().unwrap_err(),
+            EvaluteError::ExpectedOperator,
+        );
     }
 }
