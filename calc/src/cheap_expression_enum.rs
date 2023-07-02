@@ -1,4 +1,4 @@
-use std::{str::Chars, iter::Peekable};
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, PartialEq, Clone)]
 enum CheapEquationItem {
@@ -148,17 +148,11 @@ pub enum EvaluteStringError {
     UnClosedParenthesis,
 }
 
-enum f32CollectorState {
-    Sign,
-    Characteristic,
-    Mantissa,
-}
-
 impl TryFrom<&str> for CheapEquationItem {
     type Error = EvaluteStringError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut value_iterator = value.chars().peekable();
+        let value_iterator = value.chars().peekable();
 
         let get_next_number = |value_iterator: &mut Peekable<Chars<'_>>| -> Option<f32> {
             let mut number_string = String::new();
@@ -167,16 +161,19 @@ impl TryFrom<&str> for CheapEquationItem {
                 number_string.push(value_iterator.next().unwrap())
             };
 
-            while let Some(character) = value_iterator.peek() {
-                match character {
-                    _ if character.is_ascii_digit() => {number_string.push(value_iterator.next()?)},
-                    '.' if number_string.contains('.') => {return None;},
-                    '.'=> {number_string.push(value_iterator.next()?)},
-                    '_' => continue,
-                    _ => break,
-                }
+            while let Some(character) = value_iterator.next_if(|character| {
+                character.is_ascii_digit() || character == &'.' && !number_string.contains('.')
+            }) {
+                number_string.push(character);
             }
             number_string.parse::<f32>().ok()
+        };
+
+        let skip_whitespace = |value_iterator: &mut Peekable<Chars<'_>>| -> () {
+            while let Some(' ') = value_iterator.next_if(|character| character.is_whitespace()) {
+                continue;
+            }
+        };
         todo!()
     }
 }
@@ -257,9 +254,7 @@ mod reduce_tests {
 
 #[cfg(test)]
 mod try_from_tests {
-    use core::num;
-    use std::{str::Chars, iter::Peekable};
-
+    use std::{iter::Peekable, str::Chars};
 
     fn match_number(value: &str) -> Option<f32> {
         let mut value_iterator = value.chars().peekable();
@@ -271,25 +266,18 @@ mod try_from_tests {
                 number_string.push(value_iterator.next().unwrap())
             };
 
-            while let Some(character) = value_iterator.peek() {
-                match character {
-                    _ if character.is_ascii_digit() => {number_string.push(value_iterator.next()?)},
-                    '.' if number_string.contains('.') => {return None;},
-                    '.'=> {number_string.push(value_iterator.next()?)},
-                    '_' => continue,
-                    _ => break,
-                }
+            while let Some(character) = value_iterator.next_if(|character| {
+                character.is_ascii_digit() || character == &'.' && !number_string.contains('.')
+            }) {
+                number_string.push(character);
             }
             number_string.parse::<f32>().ok()
         };
-        let number = get_next_number(&mut value_iterator);
-        dbg!(&value_iterator.peek());
-        number
+        get_next_number(&mut value_iterator)
     }
 
     #[test]
     fn match_number_test() {
-        
         assert_eq!(match_number("1"), Some(1f32));
         assert_eq!(match_number("1."), Some(1.0f32));
         assert_eq!(match_number("1.1"), Some(1.1f32));
