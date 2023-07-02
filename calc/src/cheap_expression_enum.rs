@@ -158,25 +158,25 @@ impl TryFrom<&str> for CheapEquationItem {
     type Error = EvaluteStringError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let get_next_number = |slice: &str| -> Option<f32> {
-            let mut slice_iterator = slice.chars().peekable();
+        let mut value_iterator = value.chars().peekable();
+
+        let get_next_number = |value_iterator: &mut Peekable<Chars<'_>>| -> Option<f32> {
             let mut number_string = String::new();
 
-            if let Some('-') | Some('+') = &slice_iterator.peek() {
-                number_string.push(slice_iterator.next().unwrap())
+            if let Some('-') | Some('+') = &value_iterator.peek() {
+                number_string.push(value_iterator.next().unwrap())
             };
 
-            for character in slice_iterator {
+            while let Some(character) = value_iterator.peek() {
                 match character {
-                    _ if character.is_ascii_digit() => {number_string.push(character)},
+                    _ if character.is_ascii_digit() => {number_string.push(value_iterator.next()?)},
                     '.' if number_string.contains('.') => {return None;},
-                    '.'=> {number_string.push('.')},
+                    '.'=> {number_string.push(value_iterator.next()?)},
                     '_' => continue,
                     _ => break,
                 }
             }
             number_string.parse::<f32>().ok()
-        };
         todo!()
     }
 }
@@ -259,34 +259,44 @@ mod reduce_tests {
 mod try_from_tests {
     use core::num;
     use std::{str::Chars, iter::Peekable};
-    #[test]
-    fn match_number() {
-        let get_next_number = |slice: &str| -> Option<f32> {
-            let mut slice_iterator = slice.chars().peekable();
+
+
+    fn match_number(value: &str) -> Option<f32> {
+        let mut value_iterator = value.chars().peekable();
+
+        let get_next_number = |value_iterator: &mut Peekable<Chars<'_>>| -> Option<f32> {
             let mut number_string = String::new();
 
-            if let Some('-') | Some('+') = &slice_iterator.peek() {
-                number_string.push(slice_iterator.next().unwrap())
+            if let Some('-') | Some('+') = &value_iterator.peek() {
+                number_string.push(value_iterator.next().unwrap())
             };
 
-            for character in slice_iterator {
+            while let Some(character) = value_iterator.peek() {
                 match character {
-                    _ if character.is_ascii_digit() => {number_string.push(character)},
+                    _ if character.is_ascii_digit() => {number_string.push(value_iterator.next()?)},
                     '.' if number_string.contains('.') => {return None;},
-                    '.'=> {number_string.push('.')},
+                    '.'=> {number_string.push(value_iterator.next()?)},
                     '_' => continue,
                     _ => break,
                 }
             }
             number_string.parse::<f32>().ok()
         };
-        assert_eq!(get_next_number("1"), Some(1f32));
-        assert_eq!(get_next_number("1."), Some(1.0f32));
-        assert_eq!(get_next_number("1.1"), Some(1.1f32));
-        assert_eq!(get_next_number("-1.1"), Some(-1.1f32));
-        assert_eq!(get_next_number("+1.1"), Some(1.1f32));
-        assert_eq!(get_next_number("+1. + 1"), Some(1.0f32));
-        assert_eq!(get_next_number("++1.1"), None);
-        assert_eq!(get_next_number("++1.1"), None);
+        let number = get_next_number(&mut value_iterator);
+        dbg!(&value_iterator.peek());
+        number
+    }
+
+    #[test]
+    fn match_number_test() {
+        
+        assert_eq!(match_number("1"), Some(1f32));
+        assert_eq!(match_number("1."), Some(1.0f32));
+        assert_eq!(match_number("1.1"), Some(1.1f32));
+        assert_eq!(match_number("-1.1"), Some(-1.1f32));
+        assert_eq!(match_number("+1.1"), Some(1.1f32));
+        assert_eq!(match_number("+1. + 1"), Some(1.0f32));
+        assert_eq!(match_number("++1.1"), None);
+        assert_eq!(match_number("++1.1"), None);
     }
 }
