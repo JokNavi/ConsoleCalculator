@@ -1,3 +1,5 @@
+use std::{str::Chars, iter::Peekable};
+
 #[derive(Debug, PartialEq, Clone)]
 enum CheapEquationItem {
     Operand(f32),
@@ -146,23 +148,54 @@ pub enum EvaluteStringError {
     UnClosedParenthesis,
 }
 
+enum f32CollectorState {
+    Sign,
+    Characteristic,
+    Mantissa,
+}
+
 impl TryFrom<&str> for CheapEquationItem {
     type Error = EvaluteStringError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let get_next_number = |slice: &str| -> Option<f32> {
+            let mut slice_iterator = slice.chars().peekable();
+            let mut number_string = String::new();
+
+            if let Some('-') | Some('+') = &slice_iterator.peek() {
+                number_string.push(slice_iterator.next().unwrap())
+            };
+
+            for character in slice_iterator {
+                match character {
+                    _ if character.is_ascii_digit() => {number_string.push(character)},
+                    '.' if number_string.contains('.') => {return None;},
+                    '.'=> {number_string.push('.')},
+                    '_' => continue,
+                    _ => break,
+                }
+            }
+            number_string.parse::<f32>().ok()
+        };
         todo!()
     }
 }
 
 #[cfg(test)]
-mod evaluate_tests {
+mod reduce_tests {
     use super::*;
 
     #[test]
-    fn evaluate() {
+    fn try_reduced() {
         let expression: Vec<CheapEquationItem> = vec![
             CheapEquationItem::Operand(1.0),
             CheapEquationItem::Operator('+'),
+            CheapEquationItem::Parenthesis(Box::new(vec![
+                CheapEquationItem::Operand(1.0),
+                CheapEquationItem::Operator('+'),
+                CheapEquationItem::Operand(1.0),
+            ])),
+            CheapEquationItem::Operator('-'),
             CheapEquationItem::Operand(1.0),
         ];
         assert_eq!(
@@ -219,5 +252,41 @@ mod evaluate_tests {
             broken_expression.try_reduced().unwrap_err(),
             ReduceCheapEquationItemError::ExpectedOperator,
         );
+    }
+}
+
+#[cfg(test)]
+mod try_from_tests {
+    use core::num;
+    use std::{str::Chars, iter::Peekable};
+    #[test]
+    fn match_number() {
+        let get_next_number = |slice: &str| -> Option<f32> {
+            let mut slice_iterator = slice.chars().peekable();
+            let mut number_string = String::new();
+
+            if let Some('-') | Some('+') = &slice_iterator.peek() {
+                number_string.push(slice_iterator.next().unwrap())
+            };
+
+            for character in slice_iterator {
+                match character {
+                    _ if character.is_ascii_digit() => {number_string.push(character)},
+                    '.' if number_string.contains('.') => {return None;},
+                    '.'=> {number_string.push('.')},
+                    '_' => continue,
+                    _ => break,
+                }
+            }
+            number_string.parse::<f32>().ok()
+        };
+        assert_eq!(get_next_number("1"), Some(1f32));
+        assert_eq!(get_next_number("1."), Some(1.0f32));
+        assert_eq!(get_next_number("1.1"), Some(1.1f32));
+        assert_eq!(get_next_number("-1.1"), Some(-1.1f32));
+        assert_eq!(get_next_number("+1.1"), Some(1.1f32));
+        assert_eq!(get_next_number("+1. + 1"), Some(1.0f32));
+        assert_eq!(get_next_number("++1.1"), None);
+        assert_eq!(get_next_number("++1.1"), None);
     }
 }
