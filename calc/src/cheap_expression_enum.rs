@@ -1,3 +1,4 @@
+use core::num;
 use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -7,7 +8,7 @@ enum CheapEquationItem {
     Parenthesis(Parenthesis),
 }
 
-type Parenthesis = Box<Vec<CheapEquationItem>>;
+pub type Parenthesis = Box<Vec<CheapEquationItem>>;
 
 impl CheapEquationItem {
     pub fn operand(&self) -> Option<f32> {
@@ -142,38 +143,95 @@ impl Reduce for CheapEquationItem {
         }
     }
 }
-
+#[derive(Debug, PartialEq)]
 pub enum EvaluteStringError {
     EvaluteError(ReduceCheapEquationItemError),
     UnClosedParenthesis,
+    EmptyParenthesis,
+}
+
+trait GetEquationItem {
+    fn get_operand(&mut self) -> Option<CheapEquationItem>;
+    fn get_operator(&mut self) -> Option<CheapEquationItem>;
+    fn get_parenthesis(&mut self) -> Result<CheapEquationItem, EvaluteStringError>;
+    fn skip_whitespace(&mut self) -> ();
+    fn get_next(
+        &mut self,
+        layer: &Vec<CheapEquationItem>,
+    ) -> Option<Result<CheapEquationItem, EvaluteStringError>>;
+}
+
+impl GetEquationItem for Peekable<Chars<'_>> {
+    fn get_operand(&mut self) -> Option<CheapEquationItem> {
+        let mut number_string = String::new();
+        if let Some(character) = self.next_if(|character| character == &'-' || character == &'+') {
+            number_string.push(character);
+        };
+
+        while let Some(character) = self.next_if(|character| {
+            character.is_ascii_digit() || (character == &'.' && !number_string.contains('.'))
+        }) {
+            number_string.push(character);
+        }
+        number_string
+            .parse::<f32>()
+            .ok()
+            .map(|number| CheapEquationItem::Operand(number))
+    }
+
+    fn get_operator(&mut self) -> Option<CheapEquationItem> {
+        self.next_if(|character| matches!(character, '^' | '*' | '/' | '%' | '+' | '-'))
+            .map(|operator| CheapEquationItem::Operator(operator))
+    }
+
+    fn get_next(
+        &mut self,
+        layer: &Vec<CheapEquationItem>,
+    ) -> Option<Result<CheapEquationItem, EvaluteStringError>> {
+        match layer.last() {
+            Some(CheapEquationItem::Operand(_)) | Some(CheapEquationItem::Parenthesis(_)) => {
+                if self.next_if_eq(&')').is_some() {
+                    return None;
+                };
+                Some(self.get_operator().ok_or(EvaluteStringError::EvaluteError(
+                    ReduceCheapEquationItemError::ExpectedOperator,
+                )))
+            }
+            Some(CheapEquationItem::Operator(_)) | None => {
+                if self.next_if_eq(&'(').is_some() {
+                    return Some(self.get_parenthesis());
+                };
+                Some(self.get_operand().ok_or(EvaluteStringError::EvaluteError(
+                    ReduceCheapEquationItemError::ExpectedOperand,
+                )))
+            }
+        }
+    }
+
+    fn get_parenthesis(&mut self) -> Result<CheapEquationItem, EvaluteStringError> {
+        //"(-1.5)+(1.0)"
+        let mut layer: Vec<CheapEquationItem> = Vec::new();
+
+        while self.peek().is_some() {
+            self.skip_whitespace();
+            if let Some(next) = self.get_next(&layer) {
+                layer.push(next?);
+            } else {
+                break;
+            }
+        }
+        Ok(CheapEquationItem::Parenthesis(Box::new(layer)))
+    }
+
+    fn skip_whitespace(&mut self) -> () {
+        while let Some(_) = self.next_if(|character| character.is_ascii_whitespace()) {}
+    }
 }
 
 impl TryFrom<&str> for CheapEquationItem {
     type Error = EvaluteStringError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let value_iterator = value.chars().peekable();
-
-        let get_next_number = |value_iterator: &mut Peekable<Chars<'_>>| -> Option<f32> {
-            let mut number_string = String::new();
-
-            if let Some('-') | Some('+') = &value_iterator.peek() {
-                number_string.push(value_iterator.next().unwrap())
-            };
-
-            while let Some(character) = value_iterator.next_if(|character| {
-                character.is_ascii_digit() || character == &'.' && !number_string.contains('.')
-            }) {
-                number_string.push(character);
-            }
-            number_string.parse::<f32>().ok()
-        };
-
-        let skip_whitespace = |value_iterator: &mut Peekable<Chars<'_>>| -> () {
-            while let Some(' ') = value_iterator.next_if(|character| character.is_whitespace()) {
-                continue;
-            }
-        };
         todo!()
     }
 }
@@ -253,38 +311,58 @@ mod reduce_tests {
 }
 
 #[cfg(test)]
-mod try_from_tests {
-    use std::{iter::Peekable, str::Chars};
-
-    fn match_number(value: &str) -> Option<f32> {
-        let mut value_iterator = value.chars().peekable();
-
-        let get_next_number = |value_iterator: &mut Peekable<Chars<'_>>| -> Option<f32> {
-            let mut number_string = String::new();
-
-            if let Some('-') | Some('+') = &value_iterator.peek() {
-                number_string.push(value_iterator.next().unwrap())
-            };
-
-            while let Some(character) = value_iterator.next_if(|character| {
-                character.is_ascii_digit() || character == &'.' && !number_string.contains('.')
-            }) {
-                number_string.push(character);
-            }
-            number_string.parse::<f32>().ok()
-        };
-        get_next_number(&mut value_iterator)
-    }
+mod get_equation_item_tests {
+    use super::*;
 
     #[test]
     fn match_number_test() {
-        assert_eq!(match_number("1"), Some(1f32));
-        assert_eq!(match_number("1."), Some(1.0f32));
-        assert_eq!(match_number("1.1"), Some(1.1f32));
-        assert_eq!(match_number("-1.1"), Some(-1.1f32));
-        assert_eq!(match_number("+1.1"), Some(1.1f32));
-        assert_eq!(match_number("+1. + 1"), Some(1.0f32));
-        assert_eq!(match_number("++1.1"), None);
-        assert_eq!(match_number("++1.1"), None);
+        assert_eq!(
+            "1".chars().peekable().get_operand(),
+            Some(CheapEquationItem::Operand(1f32))
+        );
+        assert_eq!(
+            "1.0".chars().peekable().get_operand(),
+            Some(CheapEquationItem::Operand(1f32))
+        );
+        assert_eq!(
+            "-1.15".chars().peekable().get_operand(),
+            Some(CheapEquationItem::Operand(-1.15f32))
+        );
+        assert_eq!(
+            "1.5".chars().peekable().get_operand(),
+            Some(CheapEquationItem::Operand(1.5f32))
+        );
+    }
+
+    #[test]
+    fn get_parenthesis_test() {
+        assert_eq!(
+            "1".chars().peekable().get_parenthesis().unwrap(),
+            CheapEquationItem::Parenthesis(Box::new(vec![CheapEquationItem::Operand(1f32)]))
+        );
+        assert_eq!(
+            "-1.5+1.0".chars().peekable().get_parenthesis().unwrap(),
+            CheapEquationItem::Parenthesis(Box::new(vec![
+                CheapEquationItem::Operand(-1.5f32),
+                CheapEquationItem::Operator('+'),
+                CheapEquationItem::Operand(1.0f32),
+            ]))
+        );
+        assert_eq!(
+            "(-1.5)+(1.0)".chars().peekable().get_parenthesis().unwrap(),
+            CheapEquationItem::Parenthesis(Box::new(vec![
+                CheapEquationItem::Parenthesis(Box::new(vec![CheapEquationItem::Operand(-1.5f32)])),
+                CheapEquationItem::Operator('+'),
+                CheapEquationItem::Parenthesis(Box::new(vec![CheapEquationItem::Operand(1f32)])),
+            ]))
+        );
+        assert_eq!(
+            "-1.5+(1.0*2)".chars().peekable().get_parenthesis().unwrap(),
+            CheapEquationItem::Parenthesis(Box::new(vec![
+                CheapEquationItem::Operand(-1.5f32),
+                CheapEquationItem::Operator('+'),
+                CheapEquationItem::Parenthesis(Box::new(vec![CheapEquationItem::Operand(1f32), CheapEquationItem::Operator('*'), CheapEquationItem::Operand(2f32)])),
+            ]))
+        );
     }
 }
