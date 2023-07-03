@@ -1,5 +1,5 @@
 use core::num;
-use std::{iter::Peekable, str::Chars};
+use std::{iter::Peekable, ops::Deref, str::Chars};
 
 #[derive(Debug, PartialEq, Clone)]
 enum CheapEquationItem {
@@ -60,9 +60,7 @@ impl Reduce for Vec<CheapEquationItem> {
 
     fn try_reduced(&self) -> Result<Self, Self::ReduceError> {
         const OPERATION_ORDER: [&'static [char]; 3] = [&['^'], &['*', '/', '%'], &['+', '-']];
-        if matches!(self.as_slice(), [CheapEquationItem::Operand(_)]) {
-            return Err(ReduceCheapEquationItemError::ExpectedOperator);
-        }
+        
         let mut expression = self.clone();
         for operations in OPERATION_ORDER.into_iter() {
             expression = expression
@@ -129,7 +127,9 @@ impl Reduce for Vec<CheapEquationItem> {
 impl Reduce for CheapEquationItem {
     type ReduceError = ReduceCheapEquationItemError;
     fn try_reduced(&self) -> Result<Self, Self::ReduceError> {
-        match self {
+        
+
+        let result =match self {
             CheapEquationItem::Operand(operand) => Ok(CheapEquationItem::Operand(*operand)),
             CheapEquationItem::Operator(operator) => Ok(CheapEquationItem::Operator(*operator)),
             CheapEquationItem::Parenthesis(parenthesis) => Ok(CheapEquationItem::Operand(
@@ -140,7 +140,8 @@ impl Reduce for CheapEquationItem {
                     .operand()
                     .expect("I did rigorous testing on .evaluate()."),
             )),
-        }
+        };
+        result
     }
 }
 #[derive(Debug, PartialEq)]
@@ -193,9 +194,9 @@ impl GetEquationItem for Peekable<Chars<'_>> {
                 if self.next_if_eq(&')').is_some() {
                     return None;
                 };
-                Some(self.get_operator().ok_or(EvaluteStringError::EvaluteError(
-                    ReduceCheapEquationItemError::ExpectedOperator,
-                )))
+                Some(self.get_operator().ok_or({
+                    EvaluteStringError::EvaluteError(ReduceCheapEquationItemError::ExpectedOperator)
+                }))
             }
             Some(CheapEquationItem::Operator(_)) | None => {
                 if self.next_if_eq(&'(').is_some() {
@@ -228,11 +229,29 @@ impl GetEquationItem for Peekable<Chars<'_>> {
     }
 }
 
-impl TryFrom<&str> for CheapEquationItem {
+impl TryFrom<String> for CheapEquationItem {
     type Error = EvaluteStringError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.chars().peekable().get_parenthesis()
+    }
+}
+
+impl Reduce for String {
+    type ReduceError = EvaluteStringError;
+
+    fn try_reduced(&self) -> Result<Self, Self::ReduceError>
+    where
+        Self: Sized,
+    {
+        Ok(format!(
+            "{}",
+            CheapEquationItem::try_from(self.to_string())?
+                .try_reduced()
+                .map_err(|err| EvaluteStringError::EvaluteError(err))?
+                .operand()
+                .unwrap()
+        ))
     }
 }
 
@@ -278,8 +297,8 @@ mod reduce_tests {
 
         let broken_expression: Vec<CheapEquationItem> = vec![CheapEquationItem::Operand(1.0)];
         assert_eq!(
-            broken_expression.try_reduced().unwrap_err(),
-            ReduceCheapEquationItemError::ExpectedOperator,
+            broken_expression.try_reduced().unwrap(),
+            vec![CheapEquationItem::Operand(1.0)],
         );
         let broken_expression: Vec<CheapEquationItem> = vec![
             CheapEquationItem::Operand(1.0),
@@ -361,8 +380,22 @@ mod get_equation_item_tests {
             CheapEquationItem::Parenthesis(Box::new(vec![
                 CheapEquationItem::Operand(-1.5f32),
                 CheapEquationItem::Operator('+'),
-                CheapEquationItem::Parenthesis(Box::new(vec![CheapEquationItem::Operand(1f32), CheapEquationItem::Operator('*'), CheapEquationItem::Operand(2f32)])),
+                CheapEquationItem::Parenthesis(Box::new(vec![
+                    CheapEquationItem::Operand(1f32),
+                    CheapEquationItem::Operator('*'),
+                    CheapEquationItem::Operand(2f32)
+                ])),
             ]))
         );
+    }
+
+    #[test]
+    fn try_from_str_tests() {
+        assert!(CheapEquationItem::try_from("-1.5+(1.0*2)".to_string()).is_ok());
+    }
+
+    #[test]
+    fn str_try_reduce_tests() {
+        assert!("(2*2)/2".to_string().try_reduced().is_ok());
     }
 }
