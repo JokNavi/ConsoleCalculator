@@ -1,7 +1,7 @@
-use std::error::Error;
+use std::{error::Error, ops::AddAssign};
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Add,
     Subtract,
@@ -24,6 +24,15 @@ impl Operator {
         }
     }
 }
+
+impl TryFrom<char> for Operator {
+    type Error = OperatorError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        Operator::new(&value)
+    }
+}
+
 
 #[derive(Debug, PartialEq)]
 pub enum OperatorError {
@@ -50,5 +59,13 @@ mod operator_tests {
             assert!(Operator::new(&operator).is_ok());
         }
         assert!(Operator::new(&' ').is_err_and(|e| e == OperatorError::UnexpectedOperator));
+    }
+
+    #[test]
+    fn try_from() {
+        for operator in ['+', '-', '*', '/', '^', '%'] {
+            assert!(Operator::try_from(operator).is_ok());
+        }
+        assert!(Operator::try_from(' ').is_err_and(|e| e == OperatorError::UnexpectedOperator));
     }
 }

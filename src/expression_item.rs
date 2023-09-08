@@ -1,6 +1,6 @@
 use crate::operator::Operator;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExpressionItem {
     Operand(f32),
     Operator(Operator),
@@ -32,9 +32,33 @@ impl ExpressionItem {
     }
 }
 
+impl From<f32> for ExpressionItem {
+    fn from(operand: f32) -> Self {
+        ExpressionItem::Operand(operand)
+    }
+}
+
+impl From<Parentheses> for ExpressionItem {
+    fn from(parentheses: Parentheses) -> Self {
+        ExpressionItem::Parentheses(parentheses)
+    }
+}
+
+impl From<Vec<ExpressionItem>> for ExpressionItem {
+    fn from(parentheses: Vec<ExpressionItem>) -> Self {
+        ExpressionItem::Parentheses(Box::new(parentheses))
+    }
+}
+
 impl From<Operator> for ExpressionItem {
     fn from(operator: Operator) -> Self {
         ExpressionItem::Operator(operator)
+    }
+}
+
+impl From<String> for ExpressionItem {
+    fn from(string: String) -> Self {
+        todo!()
     }
 }
 
@@ -43,13 +67,35 @@ mod expression_item_tests {
 
     use super::*;
 
+
     #[test]
-    fn from_operator() {
-        for operator_char in ['+', '-', '*', '/', '^', '%'] {
-            let operator = Operator::new(&operator_char).unwrap();
+    fn from_f32() {
+        for number in 0..50 {
             assert_eq!(
-                ExpressionItem::from(operator),
-                ExpressionItem::Operator(Operator::new(&operator_char).unwrap())
+                ExpressionItem::from(number as f32),
+                ExpressionItem::Operand(number as f32),
+            );
+        }
+    }
+
+    #[test]
+    fn from_operand() {
+        for number in 0..50 {
+            assert_eq!(
+                ExpressionItem::from(number as f32),
+                ExpressionItem::Operand(number as f32),
+            );
+        }
+    }
+
+    #[test]
+    fn from_vec() {
+        let mut vector = vec![];
+        for expression_item in &[ExpressionItem::from(0.0f32), ExpressionItem::from(Operator::try_from('+').unwrap())] {
+            vector.push(expression_item.clone());
+            assert_eq!(
+                ExpressionItem::from(Box::new(vector.clone())),
+                ExpressionItem::Parentheses(Box::new(vector.clone()))
             );
         }
     }
