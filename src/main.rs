@@ -5,5 +5,4 @@ pub mod expression_builder;
 
 fn main() {
     println!("Hello, world!");
-    dbg!()
 }

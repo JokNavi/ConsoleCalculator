@@ -1,4 +1,4 @@
-use std::{error::Error, ops::AddAssign};
+use std::{error::Error, fmt::Display};
 
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,11 +25,37 @@ impl Operator {
     }
 }
 
-impl TryFrom<char> for Operator {
+impl TryFrom<&char> for Operator {
     type Error = OperatorError;
 
-    fn try_from(value: char) -> Result<Self, Self::Error> {
-        Operator::new(&value)
+    fn try_from(value: &char) -> Result<Self, Self::Error> {
+        Operator::new(value)
+    }
+}
+
+impl From<Operator> for char {
+    fn from(operator: Operator) -> Self {
+        match operator {
+            Operator::Add => '+',
+            Operator::Subtract => '-',
+            Operator::Multiply => '*',
+            Operator::Divide => '/',
+            Operator::Power => '^',
+            Operator::Remainder => '%',
+        }
+    }
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::Add => write!(f, "+"),
+            Operator::Subtract => write!(f, "-"),
+            Operator::Multiply => write!(f, "*"),
+            Operator::Divide => write!(f, "/"),
+            Operator::Power => write!(f, "^"),
+            Operator::Remainder => write!(f, "%"),
+        }
     }
 }
 
@@ -62,10 +88,19 @@ mod operator_tests {
     }
 
     #[test]
-    fn try_from() {
-        for operator in ['+', '-', '*', '/', '^', '%'] {
+    fn try_from_char() {
+        for operator in &['+', '-', '*', '/', '^', '%'] {
             assert!(Operator::try_from(operator).is_ok());
         }
-        assert!(Operator::try_from(' ').is_err_and(|e| e == OperatorError::UnexpectedOperator));
+        assert!(Operator::try_from(&' ').is_err_and(|e| e == OperatorError::UnexpectedOperator));
+    }
+
+    #[test]
+    fn into_char() {
+        for operator_char in &['+', '-', '*', '/', '^', '%'] {
+            let operator = Operator::try_from(operator_char);
+            assert!(&operator.is_ok());
+            assert_eq!(<char>::from(operator.unwrap()), *operator_char);
+        }
     }
 }

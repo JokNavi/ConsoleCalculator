@@ -1,4 +1,6 @@
-use crate::operator::Operator;
+use std::fmt::Display;
+
+use crate::operator::{Operator, OperatorError};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExpressionItem {
@@ -32,9 +34,9 @@ impl ExpressionItem {
     }
 }
 
-impl From<f32> for ExpressionItem {
-    fn from(operand: f32) -> Self {
-        ExpressionItem::Operand(operand)
+impl From<&f32> for ExpressionItem {
+    fn from(operand: &f32) -> Self {
+        ExpressionItem::Operand(*operand)
     }
 }
 
@@ -56,9 +58,26 @@ impl From<Operator> for ExpressionItem {
     }
 }
 
-impl From<String> for ExpressionItem {
-    fn from(string: String) -> Self {
-        todo!()
+impl TryFrom<char> for ExpressionItem {
+    type Error = OperatorError;
+    fn try_from(character: char) -> Result<Self, Self::Error> {
+        Ok(ExpressionItem::from(Operator::new(&character)?))
+    }
+}
+
+impl Display for ExpressionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionItem::Operand(operand) => write!(f, "{}", operand),
+            ExpressionItem::Operator(operator) => write!(f, "{}", operator),
+            ExpressionItem::Parentheses(parentheses) => {
+                write!(f, "(")?;
+                for item in parentheses.iter() {
+                    write!(f, "{}", item)?
+                }
+                write!(f, ")")
+            }
+        }
     }
 }
 
@@ -67,23 +86,22 @@ mod expression_item_tests {
 
     use super::*;
 
-
     #[test]
     fn from_f32() {
         for number in 0..50 {
             assert_eq!(
-                ExpressionItem::from(number as f32),
+                ExpressionItem::from(&(number as f32)),
                 ExpressionItem::Operand(number as f32),
             );
         }
     }
 
     #[test]
-    fn from_operand() {
-        for number in 0..50 {
+    fn from_operator() {
+        for operator in ['+', '-', '*', '/', '^', '%'] {
             assert_eq!(
-                ExpressionItem::from(number as f32),
-                ExpressionItem::Operand(number as f32),
+                ExpressionItem::from(Operator::new(&operator).unwrap()),
+                ExpressionItem::Operator(Operator::new(&operator).unwrap())
             );
         }
     }
@@ -91,12 +109,30 @@ mod expression_item_tests {
     #[test]
     fn from_vec() {
         let mut vector = vec![];
-        for expression_item in &[ExpressionItem::from(0.0f32), ExpressionItem::from(Operator::try_from('+').unwrap())] {
+        for expression_item in &[
+            ExpressionItem::from(&0.0f32),
+            ExpressionItem::from(Operator::Add),
+            ExpressionItem::Parentheses(Box::new(vec![ExpressionItem::from(Operator::Remainder)])),
+        ] {
             vector.push(expression_item.clone());
             assert_eq!(
                 ExpressionItem::from(Box::new(vector.clone())),
                 ExpressionItem::Parentheses(Box::new(vector.clone()))
             );
         }
+    }
+
+    #[test]
+    fn display() {
+        let operand = ExpressionItem::from(&-0.1f32);
+        assert_eq!(format!("{}", operand), "-0.1");
+        let operator = ExpressionItem::from(Operator::Add);
+        assert_eq!(format!("{}", operator), "+");
+        let parentheses = ExpressionItem::from(Parentheses::new(vec![
+            operand.clone(),
+            operator.clone(),
+            operand.clone(),
+        ]));
+        assert_eq!(format!("{}", parentheses), "(-0.1+-0.1)");
     }
 }
