@@ -12,16 +12,16 @@ pub enum ExpressionItem {
 pub type Parentheses = Box<Vec<ExpressionItem>>;
 
 impl ExpressionItem {
-    pub fn operand(self) -> Option<f32> {
+    pub fn operand(&self) -> Option<f32> {
         match self {
-            ExpressionItem::Operand(operand) => Some(operand),
+            ExpressionItem::Operand(operand) => Some(*operand),
             ExpressionItem::Operator(_) | ExpressionItem::Parentheses(_) => None,
         }
     }
 
-    pub fn operator(self) -> Option<Operator> {
+    pub fn operator(&self) -> Option<Operator> {
         match self {
-            ExpressionItem::Operator(operator) => Some(operator),
+            ExpressionItem::Operator(operator) => Some(operator.clone()),
             ExpressionItem::Operand(_) | ExpressionItem::Parentheses(_) => None,
         }
     }

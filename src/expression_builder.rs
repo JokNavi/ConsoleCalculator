@@ -82,12 +82,15 @@ impl<'a> ExpressionBuilder<'a> {
         ))))
     }
 
-    pub fn get_expression(&mut self) -> Result<ExpressionItem, ExpressionBuilderError> {
+    pub fn get_expression(&mut self) -> Result<Vec<ExpressionItem>, ExpressionBuilderError> {
         let mut expressions: Vec<ExpressionItem> = vec![];
         while let Ok(expression_item) = self.get_next(expressions.last()) {
             expressions.push(expression_item);
         }
-        Ok(ExpressionItem::Parentheses(Parentheses::new(expressions)))
+        if matches!(expressions.last(), Some(ExpressionItem::Operator(_))) {
+            return Err(ExpressionBuilderError::ExpectedOperand);
+        }
+        Ok(expressions)
     }
 }
 
@@ -129,11 +132,10 @@ mod expresion_builder_tests {
 
     #[test]
     fn get_operand() {
-        let mut expression = String::new();
         for sign in &['+', '-'] {
             for number in 0..100u16 {
                 for rest in 0..100 {
-                    expression = format!("{}{}.{}", sign, number, rest);
+                    let expression = format!("{}{}.{}", sign, number, rest);
                     assert!(ExpressionBuilder::new(&expression)
                         .get_operand()
                         .is_some_and(|operand| operand == expression.parse::<f32>().unwrap()));
@@ -302,6 +304,13 @@ mod expresion_builder_tests {
         assert!(ExpressionBuilder::new(&format!("{}", expression_item))
             .get_parentheses()
             .is_ok_and(|ok| ok.is_some_and(|some| some == expression_item)));
+
+        let single_vec_expression = ExpressionItem::from(vec![
+            ExpressionItem::from(&1.0),
+        ]);
+        assert!(ExpressionBuilder::new(&format!("{}", single_vec_expression))
+            .get_parentheses()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == single_vec_expression)));
     }
 
     #[test]
@@ -318,6 +327,6 @@ mod expresion_builder_tests {
         ]);
         assert!(ExpressionBuilder::new(&format!("{}", expression_item))
             .get_expression()
-            .is_ok_and(|ok| ok == ExpressionItem::from(vec![expression_item])));
+            .is_ok_and(|ok| ok == vec![expression_item]));
     }
 }
