@@ -19,7 +19,7 @@ impl<'a> ExpressionBuilder<'a> {
     fn get_operand(&mut self) -> Option<f32> {
         let mut number_string = String::new();
         if let Some(operator) = self.get_operator() {
-            number_string.push(operator.into());
+            number_string.push(char::from(&operator));
         }
         while let Some(number_item) = self.chars.next_if(|number_item| {
             number_item.is_ascii_digit() || (number_item == &'.' && !number_string.contains('.'))
@@ -84,10 +84,10 @@ impl<'a> ExpressionBuilder<'a> {
 
     pub fn get_expression(&mut self) -> Result<Vec<ExpressionItem>, ExpressionBuilderError> {
         let mut expressions: Vec<ExpressionItem> = vec![];
-        while let Ok(expression_item) = self.get_next(expressions.last()) {
-            expressions.push(expression_item);
+        while self.chars.peek().is_some() {
+            expressions.push(self.get_next(expressions.last())?);
         }
-        if matches!(expressions.last(), Some(ExpressionItem::Operator(_))) {
+        if matches!(expressions.last(), Some(ExpressionItem::Operator(_))) || expressions.last().is_none() {
             return Err(ExpressionBuilderError::ExpectedOperand);
         }
         Ok(expressions)
@@ -305,12 +305,17 @@ mod expresion_builder_tests {
             .get_parentheses()
             .is_ok_and(|ok| ok.is_some_and(|some| some == expression_item)));
 
-        let single_vec_expression = ExpressionItem::from(vec![
-            ExpressionItem::from(&1.0),
-        ]);
-        assert!(ExpressionBuilder::new(&format!("{}", single_vec_expression))
-            .get_parentheses()
-            .is_ok_and(|ok| ok.is_some_and(|some| some == single_vec_expression)));
+        let single_vec_expression = ExpressionItem::from(vec![ExpressionItem::from(&1.0)]);
+        assert!(
+            ExpressionBuilder::new(&format!("{}", single_vec_expression))
+                .get_parentheses()
+                .is_ok_and(|ok| ok.is_some_and(|some| some == single_vec_expression))
+        );
+        assert!(
+            ExpressionBuilder::new("(1")
+                .get_parentheses()
+                .is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses)
+        );
     }
 
     #[test]

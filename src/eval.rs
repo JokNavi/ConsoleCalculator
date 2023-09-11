@@ -1,35 +1,16 @@
-use std::fmt::{write, Display};
+use std::{error::Error, fmt::Display};
 
-use crate::{expression_builder::ExpressionBuilderError, expression_item::ExpressionItem};
+use crate::{
+    expression_builder::{ExpressionBuilder, ExpressionBuilderError},
+    expression_item::ExpressionItem,
+    operator::Operator,
+};
 
-pub trait Eval {
+pub trait Evaluate {
     fn eval(&self) -> Result<Option<f32>, EvalError>;
 }
 
-/*
-fn testing() -> Result<Option<f32>, EvalError> {
-    let mut expression = vec![0.0f32, 0.0f32, 0.0f32];
-    let (mut first, mut rest) = match expression.split_first().unzip() {
-        (None, None) => return Ok(None),
-        (None, Some(_)) => unreachable!(),
-        (Some(first), None) => return Ok(Some(*first)),
-        (Some(first), Some(rest)) => (first, rest),
-    };
-    expression = rest.chunks(2).fold(
-        Ok(vec![first.clone()]),
-        |acc: Result<Vec<f32>, EvalError>, chunk| {
-            let acc = acc?;
-            let left_operand = acc.last().unwrap();
-            let operator = chunk.get(0).unwrap();
-            let right_operand = chunk.get(1).ok_or(EvalError::ExpectedOperand)?;
-            Ok(acc)
-        },
-    )?;
-    todo!();
-}
-*/
-
-impl Eval for ExpressionItem {
+impl Evaluate for ExpressionItem {
     fn eval(&self) -> Result<Option<f32>, EvalError> {
         match self {
             ExpressionItem::Operand(operand) => Ok(Some(*operand)),
@@ -50,8 +31,7 @@ impl Eval for ExpressionItem {
                             let mut acc = acc?;
                             let left_operand = acc
                                 .pop()
-                                .unwrap()
-                                .operand()
+                                .unwrap().eval()?
                                 .ok_or(EvalError::ExpectedOperand)?;
                             let operator = chunk
                                 .get(0)
@@ -61,14 +41,30 @@ impl Eval for ExpressionItem {
                             let right_operand = chunk
                                 .get(1)
                                 .ok_or(EvalError::ExpectedOperand)?
-                                .operand()
+                                .eval()?
                                 .ok_or(EvalError::ExpectedOperand)?;
-                            if operations.contains(&char::from(operator)) {}
+                            if operations.contains(&char::from(&operator)) {
+                                acc.push(ExpressionItem::from(&match operator {
+                                    Operator::Power => left_operand.powf(right_operand),
+                                    Operator::Multiply => left_operand * right_operand,
+                                    Operator::Divide => left_operand / right_operand,
+                                    Operator::Remainder => left_operand % right_operand,
+                                    Operator::Add => left_operand + right_operand,
+                                    Operator::Subtract => left_operand - right_operand,
+                                }));
+                            } else {
+                                acc.append(&mut vec![
+                                    ExpressionItem::from(&left_operand),
+                                    ExpressionItem::from(operator),
+                                    ExpressionItem::from(&right_operand),
+                                ]);
+                            }
                             Ok(acc)
                         },
                     )?;
                 }
-                todo!()
+                
+                expression.first().unwrap().eval()
             }
         }
     }
@@ -91,17 +87,64 @@ impl Display for EvalError {
     }
 }
 
+impl Error for EvalError {}
+
 impl From<ExpressionBuilderError> for EvalError {
     fn from(err: ExpressionBuilderError) -> Self {
         match err {
+            ExpressionBuilderError::ExpectedOperator => EvalError::ExpectedOperator,
             ExpressionBuilderError::ExpectedOperand => EvalError::ExpectedOperand,
             err => EvalError::ExpressionBuilderError(err),
         }
     }
 }
 
-impl Eval for String {
+impl Evaluate for &str {
     fn eval(&self) -> Result<Option<f32>, EvalError> {
-        todo!()
+        ExpressionItem::from(ExpressionBuilder::new(self).get_expression()?).eval()
+    }
+}
+
+
+#[cfg(test)]
+mod eval_test {
+    use super::*;
+    use crate::expression_builder::ExpressionBuilder;
+
+
+
+    #[test]
+    fn eval_str() {
+        let expression = "1+1";
+        let expression_items = ExpressionItem::from(ExpressionBuilder::new("1+1").get_expression().unwrap());
+        let expression_eval = expression_items.eval();
+        assert!(expression_eval.is_ok());
+        assert!(expression_eval.as_ref().unwrap().is_some());
+        assert_eq!(expression_eval.as_ref().unwrap().unwrap(), 2.0);
+        assert_eq!(expression.eval(), expression_eval);
+    }
+
+    #[test]
+    fn eval_ok() {
+        assert!(r"+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"(1)+0".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"1.5+(1)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.5)));
+        assert!(r"1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"-100.0".eval().is_ok_and(|ok| ok.is_some_and(|some| some == -100.0)));
+        assert!(r"1+1+1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 4.0)));
+        assert!(r"5+(10*2)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 25.0)));
+        assert!(r"1+-1+1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"2+2-2*2/2%2^2".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"1+(1)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+    }
+
+    #[test]
+    fn eval_err() {
+        assert!(r"+".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
+        assert!(r"".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
+        assert!(r"(1".eval().is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses.into()));
+        assert!(r"1)".eval().is_err_and(|err| err == EvalError::ExpectedOperator));
+        assert!(r"1+".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
     }
 }

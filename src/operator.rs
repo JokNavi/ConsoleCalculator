@@ -33,8 +33,8 @@ impl TryFrom<&char> for Operator {
     }
 }
 
-impl From<Operator> for char {
-    fn from(operator: Operator) -> Self {
+impl From<&Operator> for char {
+    fn from(operator: &Operator) -> Self {
         match operator {
             Operator::Add => '+',
             Operator::Subtract => '-',
@@ -100,7 +100,7 @@ mod operator_tests {
         for operator_char in &['+', '-', '*', '/', '^', '%'] {
             let operator = Operator::try_from(operator_char);
             assert!(&operator.is_ok());
-            assert_eq!(<char>::from(operator.unwrap()), *operator_char);
+            assert_eq!(<char>::from(&operator.unwrap()), *operator_char);
         }
     }
 }
