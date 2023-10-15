@@ -126,7 +126,7 @@ mod eval_test {
 
     #[test]
     fn eval_ok() {
-        assert!(r"+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"-1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == -1.0)));
         assert!(r"1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
         assert!(r"(1)+0".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
         assert!(r"1.5+(1)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.5)));
