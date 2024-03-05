@@ -31,7 +31,8 @@ impl Evaluate for ExpressionItem {
                             let mut acc = acc?;
                             let left_operand = acc
                                 .pop()
-                                .unwrap().eval()?
+                                .unwrap()
+                                .eval()?
                                 .ok_or(EvalError::ExpectedOperand)?;
                             let operator = chunk
                                 .get(0)
@@ -63,7 +64,7 @@ impl Evaluate for ExpressionItem {
                         },
                     )?;
                 }
-                
+
                 expression.first().unwrap().eval()
             }
         }
@@ -105,18 +106,16 @@ impl Evaluate for &str {
     }
 }
 
-
 #[cfg(test)]
 mod eval_test {
     use super::*;
     use crate::expression_builder::ExpressionBuilder;
 
-
-
     #[test]
     fn eval_str() {
         let expression = "1+1";
-        let expression_items = ExpressionItem::from(ExpressionBuilder::new("1+1").get_expression().unwrap());
+        let expression_items =
+            ExpressionItem::from(ExpressionBuilder::new("1+1").get_expression().unwrap());
         let expression_eval = expression_items.eval();
         assert!(expression_eval.is_ok());
         assert!(expression_eval.as_ref().unwrap().is_some());
@@ -126,25 +125,57 @@ mod eval_test {
 
     #[test]
     fn eval_ok() {
-        assert!(r"-1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == -1.0)));
-        assert!(r"1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
-        assert!(r"(1)+0".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
-        assert!(r"1.5+(1)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.5)));
-        assert!(r"1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
-        assert!(r"-100.0".eval().is_ok_and(|ok| ok.is_some_and(|some| some == -100.0)));
-        assert!(r"1+1+1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 4.0)));
-        assert!(r"5+(10*2)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 25.0)));
-        assert!(r"1+-1+1+1".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
-        assert!(r"2+2-2*2/2%2^2".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
-        assert!(r"1+(1)".eval().is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"-1"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == -1.0)));
+        assert!(r"1+1"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"(1)+0"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"1.5+(1)"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 2.5)));
+        assert!(r"1"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 1.0)));
+        assert!(r"-100.0"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == -100.0)));
+        assert!(r"1+1+1+1"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 4.0)));
+        assert!(r"5+(10*2)"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 25.0)));
+        assert!(r"1+-1+1+1"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"2+2-2*2/2%2^2"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
+        assert!(r"1+(1)"
+            .eval()
+            .is_ok_and(|ok| ok.is_some_and(|some| some == 2.0)));
     }
 
     #[test]
     fn eval_err() {
-        assert!(r"+".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
-        assert!(r"".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
-        assert!(r"(1".eval().is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses.into()));
-        assert!(r"1)".eval().is_err_and(|err| err == EvalError::ExpectedOperator));
-        assert!(r"1+".eval().is_err_and(|err| err == EvalError::ExpectedOperand));
+        assert!(r"+"
+            .eval()
+            .is_err_and(|err| err == EvalError::ExpectedOperand));
+        assert!(r""
+            .eval()
+            .is_err_and(|err| err == EvalError::ExpectedOperand));
+        assert!(r"(1"
+            .eval()
+            .is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses.into()));
+        assert!(r"1)"
+            .eval()
+            .is_err_and(|err| err == EvalError::ExpectedOperator));
+        assert!(r"1+"
+            .eval()
+            .is_err_and(|err| err == EvalError::ExpectedOperand));
     }
 }

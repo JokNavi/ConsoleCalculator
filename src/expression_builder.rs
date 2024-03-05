@@ -87,7 +87,9 @@ impl<'a> ExpressionBuilder<'a> {
         while self.chars.peek().is_some() {
             expressions.push(self.get_next(expressions.last())?);
         }
-        if matches!(expressions.last(), Some(ExpressionItem::Operator(_))) || expressions.last().is_none() {
+        if matches!(expressions.last(), Some(ExpressionItem::Operator(_)))
+            || expressions.last().is_none()
+        {
             return Err(ExpressionBuilderError::ExpectedOperand);
         }
         Ok(expressions)
@@ -311,11 +313,9 @@ mod expresion_builder_tests {
                 .get_parentheses()
                 .is_ok_and(|ok| ok.is_some_and(|some| some == single_vec_expression))
         );
-        assert!(
-            ExpressionBuilder::new("(1")
-                .get_parentheses()
-                .is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses)
-        );
+        assert!(ExpressionBuilder::new("(1")
+            .get_parentheses()
+            .is_err_and(|err| err == ExpressionBuilderError::ExpectedClosingParentheses));
     }
 
     #[test]
